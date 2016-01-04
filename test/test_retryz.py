@@ -6,7 +6,7 @@ from hamcrest import assert_that, instance_of, equal_to, raises, greater_than, \
 from retryz import retry, RetryTimeoutError
 
 
-def _return_call_back(ret):
+def _return_callback(ret):
     return 4 + ret < 7
 
 
@@ -54,12 +54,12 @@ class RetryDemo(object):
         else:
             raise AttributeError()
 
-    def _error_call_back(self, ex):
+    def _error_callback(self, ex):
         assert_that(ex, instance_of(TypeError))
         return self.call_count != 4
 
-    @retry(error_call_back=_error_call_back)
-    def error_call_back(self):
+    @retry(on_error=_error_callback)
+    def error_callback(self):
         self._call_count += 1
         raise TypeError()
 
@@ -92,8 +92,8 @@ class RetryDemo(object):
         self._call_count += 1
         return self.call_count
 
-    @retry(return_call_back=_return_call_back)
-    def return_call_back(self):
+    @retry(on_return=_return_callback)
+    def return_callback(self):
         self._call_count += 1
         return self.call_count
 
@@ -141,9 +141,9 @@ class RetryTest(TestCase):
         assert_that(demo.unless_errors, raises(TypeError))
         assert_that(demo.call_count, equal_to(2))
 
-    def test_error_call_back(self):
+    def test_error_callback(self):
         demo = RetryDemo()
-        assert_that(demo.error_call_back, raises(TypeError))
+        assert_that(demo.error_callback, raises(TypeError))
         assert_that(demo.call_count, equal_to(4))
 
     def test_timeout(self):
@@ -170,9 +170,9 @@ class RetryTest(TestCase):
         demo = RetryDemo()
         assert_that(demo.unless_returns(), equal_to(3))
 
-    def test_return_call_back(self):
+    def test_return_callback(self):
         demo = RetryDemo()
-        assert_that(demo.return_call_back(), equal_to(3))
+        assert_that(demo.return_callback(), equal_to(3))
 
     def test_limit(self):
         demo = RetryDemo()

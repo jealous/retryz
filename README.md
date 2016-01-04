@@ -54,17 +54,18 @@ def my_func():
     ...
 ```
 
-* Retry until `error_call_back` returns `False`.  Note that callback could be
+* When `on_error` is a callback, 
+it will retry until `on_error` returns `False`.  Note that callback could be
 a function or an instancemethod.  But it could not be a staticmethod or
 class method.  It takes one parameter which is the error instance raised by
 the decorated function.
 
 ```python
-def _error_call_back(self, ex):
+def _error_callback(self, ex):
     assert_that(ex, instance_of(TypeError))
     return self.call_count != 4
 
-@retry(error_call_back=_error_call_back)
+@retry(on_error=_error_callback)
 def error_call_back(self):
     ...
 ```
@@ -101,16 +102,17 @@ def my_func(self):
     ...
 ```
 
-* Retry until `return_call_back` returns `False`.  Note that callback could be
+* When `on_return` is a callback, 
+it will retry until `on_return` returns `False`.  Note that callback could be
 a function or an instancemethod.  But it could not be a staticmethod or
 class method.  It takes one parameter which is the return value of the 
 decorated function.
 
 ```python
-def _return_call_back(ret):
+def _return_callback(ret):
     return 4 + ret < 7
 
-@retry(return_call_back=_return_call_back)
+@retry(on_return=_return_callback)
 def my_func(self):
     ...
 ```
@@ -139,8 +141,9 @@ def my_func():
     ...
 ```
 
-* Use `wait_callback` to return the amount of seconds to wait.
-The `wait_callback` could be a function or a instance method.
+* When `wait` is a callback, it will wait for the amount of
+seconds returned by the callback.
+The callback could be a function or a instance method.
 It takes one parameter which is the current count of retry.
 
 ```python

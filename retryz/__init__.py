@@ -4,7 +4,7 @@ import threading
 from threading import Thread
 
 __author__ = 'Cedric Zhuang'
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 class RetryTimeoutError(Exception):
@@ -13,10 +13,8 @@ class RetryTimeoutError(Exception):
 
 def retry(on_error=None, on_errors=None,
           unless_error=None, unless_errors=None,
-          error_call_back=None,
           on_return=None, on_returns=None,
           unless_return=None, unless_returns=None,
-          return_call_back=None,
           limit=None, wait=None, timeout=None):
     class EventHolder(object):
         def __init__(self):
@@ -60,7 +58,7 @@ def retry(on_error=None, on_errors=None,
     def init_list(the_list, the_single):
         if the_list is None:
             the_list = []
-        if the_single is not None:
+        if the_single is not None and not is_callback(the_single):
             the_list.append(the_single)
         return the_list
 
@@ -69,21 +67,20 @@ def retry(on_error=None, on_errors=None,
             raise ValueError('positive and negative criteria cannot be '
                              'specified at the same time.')
 
-    def check_callable(func):
-        if func is not None and not callable(func):
-            raise ValueError('callback supplied is not callable.')
+    def is_callback(func):
+        return callable(func) and not isinstance(func, type)
 
     def check_return(r, inst=None):
         ret = None
         if len(on_returns) > 0:
             ret = r in on_returns
-        if return_call_back is not None:
+        if is_callback(on_return):
             if ret is None:
                 ret = False
-            if inst is not None and is_method(return_call_back):
-                ret |= return_call_back(inst, r)
+            if inst is not None and is_method(on_return):
+                ret |= on_return(inst, r)
             else:
-                ret |= return_call_back(r)
+                ret |= on_return(r)
         if r in unless_returns:
             ret = False
 
@@ -92,13 +89,14 @@ def retry(on_error=None, on_errors=None,
         return ret
 
     def has_error_option():
-        return on_errors or unless_errors or error_call_back is not None
+        return on_errors or unless_errors or is_callback(on_error)
 
     def check_error(err, inst=None):
         ret = None
         if len(on_errors) > 0:
             ret = isinstance(err, tuple(on_errors))
-        if error_call_back is not None:
+        if is_callback(on_error):
+            error_call_back = on_error
             if ret is None:
                 ret = False
             if inst is not None and is_method(error_call_back):
@@ -124,10 +122,10 @@ def retry(on_error=None, on_errors=None,
     def is_method(func=None):
         ret = False
         if func is None:
-            if error_call_back is not None:
-                ret |= arg_length(error_call_back) == 2
-            if return_call_back is not None:
-                ret |= arg_length(return_call_back) == 2
+            if is_callback(on_error):
+                ret |= arg_length(on_error) == 2
+            if is_callback(on_return):
+                ret |= arg_length(on_return) == 2
             if callable(wait):
                 ret |= arg_length(wait) == 2
         else:
@@ -179,9 +177,6 @@ def retry(on_error=None, on_errors=None,
     on_returns = init_list(on_returns, on_return)
     unless_returns = init_list(unless_returns, unless_return)
     check_exclusive(on_returns, unless_returns)
-
-    check_callable(error_call_back)
-    check_callable(return_call_back)
 
     # the event to break sleep when timeout
     event_holder = EventHolder()
