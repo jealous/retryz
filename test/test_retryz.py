@@ -1,13 +1,50 @@
 from unittest import TestCase
 
-from hamcrest import assert_that, instance_of, equal_to, raises, greater_than, \
-    less_than
+from hamcrest import assert_that, instance_of, equal_to, raises, \
+    greater_than, less_than
 
 from retryz import retry, RetryTimeoutError
 
 
 def _return_callback(ret):
     return 4 + ret < 7
+
+
+def func_wait_callback(tried):
+    if tried <= 6:
+        ret = 0.01
+    else:
+        ret = 1000
+    return ret
+
+
+class ForClassMethod(object):
+    def __init__(self):
+        self.a = 0
+
+    @classmethod
+    def class_wait_callback(cls, tried):
+        if tried <= 3:
+            ret = 0.01
+        else:
+            ret = 1000
+        return ret
+
+    @staticmethod
+    def static_wait_callback(tried):
+        if tried <= 4:
+            ret = 0.01
+        else:
+            ret = 1000
+        return ret
+
+    def other_method_wait_callback(self, tried):
+        self.a += 1
+        if tried <= 2:
+            ret = 0.01
+        else:
+            ret = 1000
+        return ret
 
 
 class RetryDemo(object):
@@ -119,6 +156,34 @@ class RetryDemo(object):
         self._call_count += 1
         return self.call_count
 
+    @retry(wait=ForClassMethod.class_wait_callback, timeout=0.1)
+    def class_wait_callback(self):
+        self._call_count += 1
+        return self.call_count
+
+    @retry(wait=ForClassMethod.static_wait_callback, timeout=0.1)
+    def static_wait_callback(self):
+        self._call_count += 1
+        return self.call_count
+
+    @retry(wait=func_wait_callback, timeout=0.1)
+    def func_wait_callback(self):
+        self._call_count += 1
+        return self.call_count
+
+    @retry(wait=ForClassMethod().other_method_wait_callback, timeout=0.1)
+    def other_method_wait_callback(self):
+        self._call_count += 1
+        return self.call_count
+
+    def _on_retry(self):
+        self._call_count += 1
+
+    @retry(on_retry=_on_retry, limit=3)
+    def on_retry(self):
+        self._call_count += 1
+        return self.call_count
+
 
 class RetryTest(TestCase):
     def test_on_error(self):
@@ -188,3 +253,27 @@ class RetryTest(TestCase):
         demo = RetryDemo()
         assert_that(demo.wait_callback, raises(RetryTimeoutError))
         assert_that(demo.call_count, equal_to(6))
+
+    def test_func_wait_callback(self):
+        demo = RetryDemo()
+        assert_that(demo.func_wait_callback, raises(RetryTimeoutError))
+        assert_that(demo.call_count, equal_to(7))
+
+    def test_class_wait_callback(self):
+        demo = RetryDemo()
+        assert_that(demo.class_wait_callback, raises(RetryTimeoutError))
+        assert_that(demo.call_count, equal_to(4))
+
+    def test_static_wait_callback(self):
+        demo = RetryDemo()
+        assert_that(demo.static_wait_callback, raises(RetryTimeoutError))
+        assert_that(demo.call_count, equal_to(5))
+
+    def test_other_method_wait_callback(self):
+        demo = RetryDemo()
+        assert_that(demo.other_method_wait_callback, raises(RetryTimeoutError))
+        assert_that(demo.call_count, equal_to(3))
+
+    def test_on_retry(self):
+        demo = RetryDemo()
+        assert_that(demo.on_retry(), equal_to(5))

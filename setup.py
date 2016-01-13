@@ -2,8 +2,8 @@ from setuptools import setup
 from pip.req import parse_requirements
 import io
 import os
-import retryz
 
+__version__ = '0.1.2'
 __author__ = 'Cedric Zhuang'
 
 
@@ -40,7 +40,7 @@ def get_long_description():
 
 setup(
     name="retryz",
-    version=retryz.__version__,
+    version=__version__,
     author="Cedric Zhuang",
     author_email="jealous@163.com",
     description="Retry decorator with a bunch of configuration parameters.",

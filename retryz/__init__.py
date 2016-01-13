@@ -4,49 +4,25 @@ import threading
 from threading import Thread
 
 __author__ = 'Cedric Zhuang'
-__version__ = '0.1.1'
+
+__all__ = ('retry', 'RetryTimeoutError')
 
 
 class RetryTimeoutError(Exception):
     pass
 
 
+def is_function(func):
+    return (inspect.ismethod(func) or
+            inspect.isfunction(func) or
+            isinstance(func, (classmethod, staticmethod)))
+
+
 def retry(on_error=None, on_errors=None,
           unless_error=None, unless_errors=None,
           on_return=None, on_returns=None,
           unless_return=None, unless_returns=None,
-          limit=None, wait=None, timeout=None):
-    class EventHolder(object):
-        def __init__(self):
-            self.main_event = threading.Event()
-            self.bg_event = None
-
-        def wait_main(self, seconds):
-            self.main_event.wait(seconds)
-
-        def set_main_event(self):
-            self.main_event.set()
-
-        def set_bg_event(self):
-            if self.bg_event is not None:
-                self.bg_event.set()
-
-        def is_main_set(self):
-            return self.main_event.is_set()
-
-        def is_bg_set(self):
-            ret = True
-            if self.bg_event is not None:
-                ret = self.bg_event.is_set()
-            return ret
-
-        def end_timeout_check_thread(self):
-            self.set_bg_event()
-
-        def check_timeout(self):
-            if self.is_main_set():
-                raise RetryTimeoutError('retry timeout.')
-
+          limit=None, wait=None, timeout=None, on_retry=None):
     def background(func_ref, *args, **kwargs):
         if not callable(func_ref):
             raise ValueError('background only accept callable inputs.')
@@ -58,7 +34,7 @@ def retry(on_error=None, on_errors=None,
     def init_list(the_list, the_single):
         if the_list is None:
             the_list = []
-        if the_single is not None and not is_callback(the_single):
+        if the_single is not None and not is_function(the_single):
             the_list.append(the_single)
         return the_list
 
@@ -67,20 +43,19 @@ def retry(on_error=None, on_errors=None,
             raise ValueError('positive and negative criteria cannot be '
                              'specified at the same time.')
 
-    def is_callback(func):
-        return callable(func) and not isinstance(func, type)
+    def call(func, inst, *args):
+        try:
+            ret = func(*args)
+        except TypeError:
+            ret = func(inst, *args)
+        return ret
 
-    def check_return(r, inst=None):
+    def check_return(args, r):
         ret = None
         if len(on_returns) > 0:
             ret = r in on_returns
-        if is_callback(on_return):
-            if ret is None:
-                ret = False
-            if inst is not None and is_method(on_return):
-                ret |= on_return(inst, r)
-            else:
-                ret |= on_return(r)
+        elif is_function(on_return):
+            ret = call(on_return, args[0], r)
         if r in unless_returns:
             ret = False
 
@@ -89,20 +64,15 @@ def retry(on_error=None, on_errors=None,
         return ret
 
     def has_error_option():
-        return on_errors or unless_errors or is_callback(on_error)
+        return on_errors or unless_errors or is_function(on_error)
 
-    def check_error(err, inst=None):
+    def check_error(args, err):
         ret = None
         if len(on_errors) > 0:
             ret = isinstance(err, tuple(on_errors))
-        if is_callback(on_error):
-            error_call_back = on_error
-            if ret is None:
-                ret = False
-            if inst is not None and is_method(error_call_back):
-                ret |= error_call_back(inst, err)
-            else:
-                ret |= error_call_back(err)
+        elif is_function(on_error):
+            ret = call(on_error, args[0], err)
+
         if len(unless_errors) > 0:
             if ret is None:
                 ret = True
@@ -115,37 +85,17 @@ def retry(on_error=None, on_errors=None,
             raise err
         return ret
 
-    def arg_length(f):
-        arg_spec = inspect.getargspec(f)
-        return len(arg_spec.args)
-
-    def is_method(func=None):
-        ret = False
-        if func is None:
-            if is_callback(on_error):
-                ret |= arg_length(on_error) == 2
-            if is_callback(on_return):
-                ret |= arg_length(on_return) == 2
-            if callable(wait):
-                ret |= arg_length(wait) == 2
-        else:
-            ret = arg_length(func) == 2
-        return ret
-
     # noinspection PyCallingNonCallable
-    def get_wait(inst, retry_count):
+    def get_wait(args, retry_count):
+        ret = None
         if wait is None or retry_count == 0:
             ret = 0
         elif isinstance(wait, numbers.Number):
             ret = wait
-        elif callable(wait):
-            if arg_length(wait) == 1:
-                ret = wait(retry_count)
-            elif arg_length(wait) == 2:
-                ret = wait(inst, retry_count)
-            else:
-                raise ValueError('wait callback should have one param.')
-        else:
+        elif is_function(wait):
+            ret = call(wait, args[0], retry_count)
+
+        if ret is None:
             raise ValueError('wait should be a number or '
                              'a callback of try count.')
         return ret
@@ -155,18 +105,14 @@ def retry(on_error=None, on_errors=None,
         evt_holder.bg_event.wait(timeout)
         evt_holder.set_main_event()
 
-    def get_inst(args):
-        """ retrieve the `self` parameter of the callback
-
-        :param args: arguments of the callback function
-        :return: `self` argument of the method if callback is
-                 a instance method.  Otherwise returns `None`.
-        """
-        if is_method():
-            inst = args[0]
+    def call_retry_callback(args, retry_count):
+        if on_retry is None or retry_count == 0:
+            pass
+        elif is_function(on_retry):
+            call(on_retry, args[0])
         else:
-            inst = None
-        return inst
+            raise ValueError('on_retry should be a method accept two params:'
+                             ' value, retry_count.')
 
     if limit is None:
         limit = float("inf")
@@ -188,23 +134,24 @@ def retry(on_error=None, on_errors=None,
             need_retry = True
             tried = 0
             ret = None
-            inst = get_inst(args)
             while need_retry:
                 event_holder.check_timeout()
-                to_wait = get_wait(inst, tried)
+                to_wait = get_wait(args, tried)
                 if to_wait > 0:
                     if not event_holder.is_main_set():
                         event_holder.wait_main(to_wait)
                     event_holder.check_timeout()
+
+                call_retry_callback(args, tried)
                 try:
                     tried += 1
                     ret = func(*args, **kwargs)
-                    need_retry = check_return(ret, inst)
+                    need_retry = check_return(args, ret)
                     if tried >= limit:
                         need_retry = False
                 # noinspection PyBroadException
                 except Exception as e:
-                    need_retry = check_error(e, inst)
+                    need_retry = check_error(args, e)
                     if tried >= limit:
                         event_holder.end_timeout_check_thread()
                         raise e
@@ -214,3 +161,35 @@ def retry(on_error=None, on_errors=None,
         return func_wrapper
 
     return decorator
+
+
+class EventHolder(object):
+    def __init__(self):
+        self.main_event = threading.Event()
+        self.bg_event = None
+
+    def wait_main(self, seconds):
+        self.main_event.wait(seconds)
+
+    def set_main_event(self):
+        self.main_event.set()
+
+    def set_bg_event(self):
+        if self.bg_event is not None:
+            self.bg_event.set()
+
+    def is_main_set(self):
+        return self.main_event.is_set()
+
+    def is_bg_set(self):
+        ret = True
+        if self.bg_event is not None:
+            ret = self.bg_event.is_set()
+        return ret
+
+    def end_timeout_check_thread(self):
+        self.set_bg_event()
+
+    def check_timeout(self):
+        if self.is_main_set():
+            raise RetryTimeoutError('retry timeout.')
