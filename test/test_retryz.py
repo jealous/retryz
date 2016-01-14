@@ -18,7 +18,7 @@ def func_wait_callback(tried):
     return ret
 
 
-class ForClassMethod(object):
+class AnotherDemoClass(object):
     def __init__(self):
         self.a = 0
 
@@ -63,7 +63,7 @@ class RetryDemo(object):
         else:
             return self.call_count
 
-    @retry(on_errors=[ValueError, TypeError])
+    @retry(on_error=lambda e: isinstance(e, (ValueError, TypeError)))
     def on_errors(self):
         self._call_count += 1
         if self.call_count == 1:
@@ -73,7 +73,7 @@ class RetryDemo(object):
         else:
             raise AttributeError()
 
-    @retry(unless_error=TypeError)
+    @retry(on_error=lambda e: not isinstance(e, TypeError))
     def unless_error(self):
         self._call_count += 1
         if self.call_count <= 2:
@@ -81,7 +81,7 @@ class RetryDemo(object):
         else:
             raise TypeError()
 
-    @retry(unless_errors=[TypeError, AttributeError])
+    @retry(on_error=lambda e: not isinstance(e, (TypeError, AttributeError)))
     def unless_errors(self):
         self._call_count += 1
         if self.call_count == 1:
@@ -100,8 +100,13 @@ class RetryDemo(object):
         self._call_count += 1
         raise TypeError()
 
-    @retry(timeout=0.05)
+    @retry(timeout=0.05, wait=lambda x: 0 if x < 5 else 100)
     def timeout(self):
+        self._call_count += 1
+        return self.call_count
+
+    @retry(timeout=lambda: 0.05, wait=lambda x: 0 if x < 6 else 100)
+    def timeout_callback(self):
         self._call_count += 1
         return self.call_count
 
@@ -114,17 +119,17 @@ class RetryDemo(object):
             ret = False
         return ret
 
-    @retry(on_returns=[1, 2, 3, 4, 5])
+    @retry(on_return=lambda x: x in (1, 2, 3, 4, 5))
     def on_returns(self):
         self._call_count += 1
         return self.call_count
 
-    @retry(unless_return=4)
+    @retry(on_return=lambda x: x != 4)
     def unless_return(self):
         self._call_count += 1
         return self.call_count
 
-    @retry(unless_returns=[3, 4])
+    @retry(on_return=lambda x: x not in [3, 4])
     def unless_returns(self):
         self._call_count += 1
         return self.call_count
@@ -156,12 +161,12 @@ class RetryDemo(object):
         self._call_count += 1
         return self.call_count
 
-    @retry(wait=ForClassMethod.class_wait_callback, timeout=0.1)
+    @retry(wait=AnotherDemoClass.class_wait_callback, timeout=0.1)
     def class_wait_callback(self):
         self._call_count += 1
         return self.call_count
 
-    @retry(wait=ForClassMethod.static_wait_callback, timeout=0.1)
+    @retry(wait=AnotherDemoClass.static_wait_callback, timeout=0.1)
     def static_wait_callback(self):
         self._call_count += 1
         return self.call_count
@@ -171,7 +176,7 @@ class RetryDemo(object):
         self._call_count += 1
         return self.call_count
 
-    @retry(wait=ForClassMethod().other_method_wait_callback, timeout=0.1)
+    @retry(wait=AnotherDemoClass().other_method_wait_callback, timeout=0.1)
     def other_method_wait_callback(self):
         self._call_count += 1
         return self.call_count
@@ -183,6 +188,15 @@ class RetryDemo(object):
     def on_retry(self):
         self._call_count += 1
         return self.call_count
+
+    @retry(limit=lambda: 3)
+    def limit_callback(self):
+        self._call_count += 1
+        return self.call_count
+
+    @retry(on_error=ValueError)
+    def unexpected_error(self):
+        raise AttributeError('unexpected attribute error.')
 
 
 class RetryTest(TestCase):
@@ -213,10 +227,13 @@ class RetryTest(TestCase):
 
     def test_timeout(self):
         demo = RetryDemo()
-        try:
-            demo.timeout()
-        except RetryTimeoutError:
-            assert_that(demo.call_count, greater_than(100))
+        assert_that(demo.timeout, raises(RetryTimeoutError))
+        assert_that(demo.call_count, equal_to(5))
+
+    def test_timeout_callback(self):
+        demo = RetryDemo()
+        assert_that(demo.timeout_callback, raises(RetryTimeoutError))
+        assert_that(demo.call_count, equal_to(6))
 
     def test_on_return(self):
         demo = RetryDemo()
@@ -277,3 +294,12 @@ class RetryTest(TestCase):
     def test_on_retry(self):
         demo = RetryDemo()
         assert_that(demo.on_retry(), equal_to(5))
+
+    def test_limit_callback(self):
+        demo = RetryDemo()
+        assert_that(demo.limit_callback(), equal_to(3))
+
+    def test_unexpected_error(self):
+        demo = RetryDemo()
+        assert_that(demo.unexpected_error,
+                    raises(AttributeError, 'unexpected'))

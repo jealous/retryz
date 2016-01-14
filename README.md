@@ -33,7 +33,7 @@ def my_func():
 * Retry if `ValueError` or `TypeError` is caught.
 
 ```python
-@retry(on_errors=[ValueError, TypeError])
+@retry(on_error=lambda e: isinstance(e, (ValueError, TypeError)))
 def my_func():
     ...
 ```
@@ -41,7 +41,7 @@ def my_func():
 * Retry until `TypeError` is caught.
 
 ```python
-@retry(unless_error=TypeError)
+@retry(on_error=lambda e: not isinstance(e, TypeError))
 def my_func():
     ...
 ```
@@ -49,7 +49,7 @@ def my_func():
 * Retry until `TypeError` or `AttributeError` is caught.
 
 ```python
-@retry(unless_errors=[TypeError, AttributeError])
+@retry(on_error=lambda e: not isinstance(e, (TypeError, AttributeError)))
 def my_func():
     ...
 ```
@@ -80,7 +80,7 @@ def my_func(self):
 * Retry if return value in the list.
 
 ```python
-@retry(on_returns=[1, 2, 3, 4, 5])
+@retry(on_return=lambda x: x in (1, 2, 3, 4, 5))
 def my_func(self):
     ...
 ```
@@ -88,7 +88,7 @@ def my_func(self):
 * Retry until certain value is returned.
 
 ```python
-@retry(unless_return=4)
+@retry(on_return=lambda x: x != 4)
 def my_func(self):
     ...
 ```
@@ -96,7 +96,7 @@ def my_func(self):
 * Retry until any of the value is returned.
 
 ```python
-@retry(unless_returns=[3, 4])
+@retry(on_return=lambda x: x not in [3, 4])
 def my_func(self):
     ...
 ```
@@ -127,6 +127,11 @@ def my_func():
 ```python
 @retry(limit=3)
 def my_func():
+    ...
+
+# or you could specify a callback
+@retry(limit=lambda: 4)
+def my_func_x():
     ...
 ```
 
