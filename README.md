@@ -169,6 +169,17 @@ def do_login():
 def requests(resource_id):
     ...
 ```
+
+* `retry` could also be called in a functional style.
+Note that the return value is a function.  If you want to call
+it, you need to add an extra `()`.
+
+```python
+def foo():
+    ...
+    
+retry(foo, limit=3, timeout=5)()
+```
  
 
 To file issue, please visit:

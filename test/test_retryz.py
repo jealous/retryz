@@ -198,6 +198,10 @@ class RetryDemo(object):
     def unexpected_error(self):
         raise AttributeError('unexpected attribute error.')
 
+    def call(self):
+        self._call_count += 1
+        return self._call_count
+
 
 class RetryTest(TestCase):
     def test_on_error(self):
@@ -303,3 +307,11 @@ class RetryTest(TestCase):
         demo = RetryDemo()
         assert_that(demo.unexpected_error,
                     raises(AttributeError, 'unexpected'))
+
+    def test_functional_limit(self):
+        demo = RetryDemo()
+        assert_that(retry(demo.call, limit=3)(), equal_to(3))
+
+    def test_functional_on_return(self):
+        demo = RetryDemo()
+        assert_that(retry(demo.call, on_return=lambda x: x < 5)(), equal_to(5))

@@ -10,7 +10,7 @@ class RetryTimeoutError(Exception):
     pass
 
 
-def retry(on_error=None, on_return=None,
+def retry(func=None, on_error=None, on_return=None,
           limit=None, wait=None, timeout=None, on_retry=None):
     class EventHolder(object):
         def __init__(self):
@@ -56,18 +56,26 @@ def retry(on_error=None, on_return=None,
         t.start()
         return t
 
-    def call(func, inst, *args):
+    def call(func, func_args, *args):
         try:
             ret = func(*args)
         except TypeError:
+            inst = get_inst(func_args)
             ret = func(inst, *args)
         return ret
+
+    def get_inst(args):
+        if len(args) > 0:
+            inst = args[0]
+        else:
+            inst = None
+        return inst
 
     def check_return(args, r):
         ret = None
         if on_return:
             if is_function(on_return):
-                ret = call(on_return, args[0], r)
+                ret = call(on_return, args, r)
             else:
                 ret = r == on_return
 
@@ -82,7 +90,7 @@ def retry(on_error=None, on_return=None,
         ret = None
         if on_error:
             if is_function(on_error):
-                ret = call(on_error, args[0], err)
+                ret = call(on_error, args, err)
             else:
                 ret = isinstance(err, on_error)
 
@@ -100,7 +108,7 @@ def retry(on_error=None, on_return=None,
         elif isinstance(limit, numbers.Number):
             ret = limit
         elif is_function(limit):
-            ret = call(limit, args[0])
+            ret = call(limit, args)
 
         if ret is None:
             raise ValueError('limit should be a number of'
@@ -113,7 +121,7 @@ def retry(on_error=None, on_return=None,
             if isinstance(timeout, numbers.Number):
                 ret = timeout
             elif is_function(timeout):
-                ret = call(timeout, args[0])
+                ret = call(timeout, args)
 
         return ret
 
@@ -124,7 +132,7 @@ def retry(on_error=None, on_return=None,
         elif isinstance(wait, numbers.Number):
             ret = wait
         elif is_function(wait):
-            ret = call(wait, args[0], retry_count)
+            ret = call(wait, args, retry_count)
 
         if ret is None:
             raise ValueError('wait should be a number or '
@@ -140,15 +148,24 @@ def retry(on_error=None, on_return=None,
         if on_retry is None or retry_count == 0:
             pass
         elif is_function(on_retry):
-            call(on_retry, args[0])
+            call(on_retry, args)
         else:
             raise ValueError('on_retry should be a method accept two params:'
                              ' value, retry_count.')
 
+    if func is not None:
+        return retry(None,
+                     on_error=on_error,
+                     on_return=on_return,
+                     limit=limit,
+                     wait=wait,
+                     timeout=timeout,
+                     on_retry=on_retry)(func)
+
     # the event to break sleep when timeout
     event_holder = EventHolder()
 
-    def decorator(func):
+    def decorator(function):
         def func_wrapper(*args, **kwargs):
             max_try = get_limit(args)
             if timeout is not None:
@@ -167,7 +184,7 @@ def retry(on_error=None, on_return=None,
                 call_retry_callback(args, tried)
                 try:
                     tried += 1
-                    ret = func(*args, **kwargs)
+                    ret = function(*args, **kwargs)
                     need_retry = check_return(args, ret)
                     if tried >= max_try:
                         need_retry = False
@@ -179,7 +196,6 @@ def retry(on_error=None, on_return=None,
                         raise e
             event_holder.end_timeout_check_thread()
             return ret
-
         return func_wrapper
 
     return decorator
