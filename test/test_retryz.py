@@ -1,7 +1,22 @@
+# coding=utf-8
+# Copyright (c) 2015 EMC Corporation.
+# All Rights Reserved.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
 from unittest import TestCase
 
 from hamcrest import assert_that, instance_of, equal_to, raises, \
-    greater_than, less_than
+    greater_than, less_than, contains_string
 
 from retryz import retry, RetryTimeoutError
 
@@ -186,6 +201,10 @@ class RetryDemo(object):
 
     @retry(on_retry=_on_retry, limit=3)
     def on_retry(self):
+        """ doc string for on retry
+
+        :return: call count
+        """
         self._call_count += 1
         return self.call_count
 
@@ -315,3 +334,8 @@ class RetryTest(TestCase):
     def test_functional_on_return(self):
         demo = RetryDemo()
         assert_that(retry(demo.call, on_return=lambda x: x < 5)(), equal_to(5))
+
+    def test_function_wrap(self):
+        demo = RetryDemo()
+        assert_that(demo.on_retry.__doc__,
+                    contains_string('doc string for on retry'))

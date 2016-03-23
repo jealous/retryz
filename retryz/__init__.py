@@ -1,3 +1,19 @@
+# coding=utf-8
+# Copyright (c) 2015 EMC Corporation.
+# All Rights Reserved.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+import functools
 import inspect
 import numbers
 import threading
@@ -43,10 +59,10 @@ def retry(func=None, on_error=None, on_return=None,
             if self.is_main_set():
                 raise RetryTimeoutError('retry timeout.')
 
-    def is_function(func):
-        return (inspect.ismethod(func) or
-                inspect.isfunction(func) or
-                isinstance(func, (classmethod, staticmethod)))
+    def is_function(f):
+        return (inspect.ismethod(f) or
+                inspect.isfunction(f) or
+                isinstance(f, (classmethod, staticmethod)))
 
     def background(func_ref, *args, **kwargs):
         if not callable(func_ref):
@@ -56,12 +72,12 @@ def retry(func=None, on_error=None, on_return=None,
         t.start()
         return t
 
-    def call(func, func_args, *args):
+    def call(f, func_args, *args):
         try:
-            ret = func(*args)
+            ret = f(*args)
         except TypeError:
             inst = get_inst(func_args)
-            ret = func(inst, *args)
+            ret = f(inst, *args)
         return ret
 
     def get_inst(args):
@@ -97,8 +113,6 @@ def retry(func=None, on_error=None, on_return=None,
         if ret is None:
             ret = True
 
-        if not ret:
-            raise err
         return ret
 
     def get_limit(args):
@@ -166,6 +180,7 @@ def retry(func=None, on_error=None, on_return=None,
     event_holder = EventHolder()
 
     def decorator(function):
+        @functools.wraps(function)
         def func_wrapper(*args, **kwargs):
             max_try = get_limit(args)
             if timeout is not None:
@@ -191,11 +206,12 @@ def retry(func=None, on_error=None, on_return=None,
                 # noinspection PyBroadException
                 except Exception as e:
                     need_retry = check_error(args, e)
-                    if tried >= max_try:
+                    if tried >= max_try or not need_retry:
                         event_holder.end_timeout_check_thread()
-                        raise e
+                        raise
             event_holder.end_timeout_check_thread()
             return ret
+
         return func_wrapper
 
     return decorator
