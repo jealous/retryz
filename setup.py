@@ -1,10 +1,15 @@
 from setuptools import setup
-from pip.req import parse_requirements
 import io
+import re
 import os
 
-__version__ = '0.1.5'
 __author__ = 'Cedric Zhuang'
+
+
+def version():
+    desc = get_long_description()
+    ret = re.findall(r'VERSION: (.*)', desc)[0]
+    return ret.strip()
 
 
 def here(filename=None):
@@ -24,23 +29,19 @@ def read(*filenames, **kwargs):
     return sep.join(buf)
 
 
-requirements = parse_requirements('requirements.txt', session=False)
-test_requirements = parse_requirements('test-requirements.txt', session=False)
+def read_requirements(filename):
+    with open(filename) as f:
+        return f.read().splitlines()
 
 
 def get_long_description():
-    filename = 'README.md'
-    try:
-        import pypandoc
-        ret = pypandoc.convert(filename, 'rst')
-    except ImportError:
-        ret = read(filename)
-    return ret
+    filename = 'README.rst'
+    return read(filename)
 
 
 setup(
     name="retryz",
-    version=__version__,
+    version=version(),
     author="Cedric Zhuang",
     author_email="jealous@163.com",
     description="Retry decorator with a bunch of configuration parameters.",
@@ -52,13 +53,18 @@ setup(
     long_description=get_long_description(),
     classifiers=[
         "Programming Language :: Python",
+        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: Implementation :: CPython",
+        "Programming Language :: Python :: Implementation :: PyPy",
         "Natural Language :: English",
         "Intended Audience :: Developers",
         "Operating System :: OS Independent",
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Topic :: Utilities",
         "License :: OSI Approved :: Apache Software License",
     ],
-    install_requires=[str(ir.req) for ir in requirements],
-    tests_require=[str(ir.req) for ir in test_requirements],
+    install_requires=read_requirements('requirements.txt'),
+    tests_require=read_requirements('test-requirements.txt')
 )
