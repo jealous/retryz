@@ -7,7 +7,7 @@ Retry Decorator
 .. image:: https://coveralls.io/repos/jealous/retryz/badge.svg
     :target: (https://coveralls.io/github/jealous/retryz
 
-VERSION: 0.1.6
+VERSION: 0.1.7
 
 Introduction
 ------------

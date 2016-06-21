@@ -46,12 +46,6 @@ def retry(func=None, on_error=None, on_return=None,
         def is_main_set(self):
             return self.main_event.is_set()
 
-        def is_bg_set(self):
-            ret = True
-            if self.bg_event is not None:
-                ret = self.bg_event.is_set()
-            return ret
-
         def end_timeout_check_thread(self):
             self.set_bg_event()
 
@@ -65,8 +59,6 @@ def retry(func=None, on_error=None, on_return=None,
                 isinstance(f, (classmethod, staticmethod)))
 
     def background(func_ref, *args, **kwargs):
-        if not callable(func_ref):
-            raise ValueError('background only accept callable inputs.')
         t = Thread(target=func_ref, args=args, kwargs=kwargs)
         t.setDaemon(True)
         t.start()
@@ -164,7 +156,7 @@ def retry(func=None, on_error=None, on_return=None,
         elif is_function(on_retry):
             call(on_retry, args)
         else:
-            raise ValueError('on_retry should be a method accept two params:'
+            raise ValueError('on_retry should be a function accept two params:'
                              ' value, retry_count.')
 
     if func is not None:
@@ -176,12 +168,12 @@ def retry(func=None, on_error=None, on_return=None,
                      timeout=timeout,
                      on_retry=on_retry)(func)
 
-    # the event to break sleep when timeout
-    event_holder = EventHolder()
-
     def decorator(function):
         @functools.wraps(function)
         def func_wrapper(*args, **kwargs):
+            # the event to break sleep when timeout
+            event_holder = EventHolder()
+
             max_try = get_limit(args)
             if timeout is not None:
                 background(on_timeout, event_holder, args)

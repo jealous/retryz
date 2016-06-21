@@ -217,6 +217,11 @@ class RetryDemo(object):
     def unexpected_error(self):
         raise AttributeError('unexpected attribute error.')
 
+    @retry(on_error=ValueError, wait=15, timeout=60 * 60 * 24 * 7)
+    def same_function(self):
+        self._call_count += 1
+        return self._call_count
+
     def call(self):
         self._call_count += 1
         return self._call_count
@@ -339,3 +344,31 @@ class RetryTest(TestCase):
         demo = RetryDemo()
         assert_that(demo.on_retry.__doc__,
                     contains_string('doc string for on retry'))
+
+    def test_same_function_first_entry(self):
+        demo = RetryDemo()
+        assert_that(demo.same_function(), equal_to(1))
+
+    def test_same_function_second_entry(self):
+        demo = RetryDemo()
+        assert_that(demo.same_function(), equal_to(1))
+
+    def test_error_wait_type(self):
+        def f():
+            @retry(wait='string')
+            def g():
+                pass
+
+            g()
+
+        assert_that(f, raises(ValueError, 'should be a number or a callback'))
+
+    def test_retry_retry_type(self):
+        def f():
+            @retry(on_retry=123)
+            def g():
+                pass
+
+            g()
+
+        assert_that(f, raises(ValueError, 'should be a function'))
