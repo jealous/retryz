@@ -81,7 +81,7 @@ def retry(func=None, on_error=None, on_return=None,
 
     def check_return(args, r):
         ret = None
-        if on_return:
+        if on_return is not None:
             if is_function(on_return):
                 ret = call(on_return, args, r)
             else:
@@ -95,15 +95,13 @@ def retry(func=None, on_error=None, on_return=None,
         return on_error is not None
 
     def check_error(args, err):
-        ret = None
-        if on_error:
+        if on_error is not None:
             if is_function(on_error):
                 ret = call(on_error, args, err)
             else:
                 ret = isinstance(err, on_error)
-
-        if ret is None:
-            ret = True
+        else:
+            ret = False
 
         return ret
 

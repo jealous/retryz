@@ -154,6 +154,18 @@ class RetryDemo(object):
         self._call_count += 1
         return self.call_count
 
+    @retry(on_return=False, wait=0.01, limit=10)
+    def practical_on_return(self):
+        self._call_count += 1
+        return self._call_count == 6
+
+    @retry(on_return=False, wait=0.01, limit=10)
+    def on_return_raise_error(self):
+        self._call_count += 1
+        if self._call_count == 3:
+            raise ValueError('error out')
+        return self._call_count == 6
+
     @retry(limit=3)
     def limit(self):
         self._call_count += 1
@@ -352,6 +364,18 @@ class RetryTest(TestCase):
     def test_same_function_second_entry(self):
         demo = RetryDemo()
         assert_that(demo.same_function(), equal_to(1))
+
+    def test_practical_on_return(self):
+        demo = RetryDemo()
+        demo.practical_on_return()
+        assert_that(demo.call_count, equal_to(6))
+
+    def test_on_return_raise_error(self):
+        def f():
+            demo = RetryDemo()
+            demo.on_return_raise_error()
+
+        assert_that(f, raises(ValueError))
 
     def test_error_wait_type(self):
         def f():
