@@ -13,6 +13,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import functools
 from unittest import TestCase
 
 from hamcrest import assert_that, instance_of, equal_to, raises, \
@@ -351,6 +352,14 @@ class RetryTest(TestCase):
     def test_functional_on_return(self):
         demo = RetryDemo()
         assert_that(retry(demo.call, on_return=lambda x: x < 5)(), equal_to(5))
+
+    def test_partial_function_on_return(self):
+        def lt(x, y):
+            return x < y
+
+        f = functools.partial(lt, y=5)
+        demo = RetryDemo()
+        assert_that(retry(demo.call, on_return=f)(), equal_to(5))
 
     def test_function_wrap(self):
         demo = RetryDemo()

@@ -56,7 +56,7 @@ def retry(func=None, on_error=None, on_return=None,
     def is_function(f):
         return (inspect.ismethod(f) or
                 inspect.isfunction(f) or
-                isinstance(f, (classmethod, staticmethod)))
+                isinstance(f, (classmethod, staticmethod, functools.partial)))
 
     def background(func_ref, *args, **kwargs):
         t = Thread(target=func_ref, args=args, kwargs=kwargs)

@@ -1,13 +1,14 @@
 Retry Decorator
 ===============
 
-.. image:: https://travis-ci.org/jealous/retryz.svg
+.. image:: https://img.shields.io/travis/jealous/retryz.svg
     :target: https://travis-ci.org/jealous/retryz
-    
-.. image:: https://coveralls.io/repos/jealous/retryz/badge.svg
-    :target: (https://coveralls.io/github/jealous/retryz
+.. image:: https://img.shields.io/coveralls/jealous/retryz.svg
+    :target: https://coveralls.io/github/jealous/retryz
+.. image:: https://img.shields.io/pypi/v/retryz.svg
+    :target: https://pypi.python.org/pypi/retryz
 
-VERSION: 0.1.8
+VERSION: 0.1.9
 
 Introduction
 ------------
